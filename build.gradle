@@ -1,0 +1,124 @@
+plugins {
+    id 'scala'
+    id 'application'
+    id 'com.bmuschko.docker-remote-api' version '6.6.1'
+    id 'com.github.johnrengelman.shadow' version '5.1.0'
+    id "com.github.maiflai.scalatest" version "0.31"
+    id "org.graalvm.plugin.compiler" version "0.1.0-alpha2"
+}
+
+mainClassName = 'de.johanneswirth.apps.authservice.AuthServiceApp'
+
+group 'de.johannes-wirth'
+version '0.0.1'
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+compileJava {
+    options.compilerArgs << '-parameters -XX:+UnlockExperimentalVMOptions -XX:+EnableJVMCI -XX:+UseJVMCICompiler'
+}
+
+ext.graalVersion = '21.3.0'
+
+graal {
+    version "$graalVersion"
+}
+
+dependencies {
+    implementation 'org.scala-lang:scala-library:2.13.6'
+    implementation 'org.scala-lang:scala-compiler:2.13.6'
+    implementation 'org.slf4j:slf4j-api:1.7.32'
+    implementation 'ch.qos.logback:logback-classic:1.2.8'
+    implementation 'com.typesafe.scala-logging:scala-logging_2.13:3.9.4'
+    implementation group: 'io.dropwizard', name: 'dropwizard-core', version: '2.0.13'
+    implementation group: 'io.dropwizard', name: 'dropwizard-jdbi3', version: '2.0.13'
+    implementation group: 'io.dropwizard', name: 'dropwizard-auth', version: '2.0.13'
+    implementation group: 'io.dropwizard', name: 'dropwizard-migrations', version: '2.0.13'
+    implementation group: 'io.dropwizard', name: 'dropwizard-json-logging', version: '2.0.13'
+    implementation group: 'de.johannes-wirth', name: 'apps-backend-common', version: '0.0.1'
+    implementation 'org.reflections:reflections:0.10.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.2'
+    testImplementation 'org.scalatest:scalatest_2.13:3.2.10'
+    testImplementation "org.graalvm.sdk:graal-sdk:$graalVersion"
+    testImplementation "org.graalvm.js:js:$graalVersion"
+    testImplementation 'me.tongfei:progressbar:0.9.2'
+    testRuntimeOnly 'com.vladsch.flexmark:flexmark-all:0.62.2'
+}
+
+shadowJar {
+    mergeServiceFiles()
+    archiveClassifier = null
+    exclude 'META-INF/*.DSA'
+    exclude 'META-INF/*.RSA'
+}
+
+jar {
+    from(configurations.compileClasspath.collect { it.isDirectory() ? it : zipTree(it) }) {
+        exclude "META-INF/*.SF"
+        exclude "META-INF/*.DSA"
+        exclude "META-INF/*.RSA"
+    }
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    manifest { attributes 'Main-Class': mainClassName }
+}
+
+task copyScript(type: Copy) {
+    from file("startup.sh")
+    into file("build/docker/")
+}
+
+task copyScript2(type: Copy) {
+    from file("build/scripts/" + rootProject.name)
+    into file("build/docker/")
+}
+
+task copyJar(type: Copy) {
+    from file("build/libs/" + rootProject.name + "-" + version + ".jar")
+    into file("build/docker/")
+}
+
+task excludeLibraries(type: Delete) {
+    delete fileTree(dir: "build/docker/${rootProject.name}/lib")
+}
+
+import com.bmuschko.gradle.docker.tasks.image.*
+
+task createDockerfile(type: Dockerfile) {
+    from 'openjdk:11'
+    label(['maintainer': 'Johannes Wirth "johannes-wirth@posteo.de"'])
+    workingDir '/' + rootProject.name
+    addFile(rootProject.name, 'bin/' + rootProject.name)
+    addFile(rootProject.name + '-' + version + '.jar', 'lib/' + rootProject.name + '-' + version + '.jar')
+    exposePort(8080,8081)
+    entryPoint 'sh'
+    defaultCommand 'startup.sh'
+    addFile('startup.sh', 'startup.sh')
+}
+
+task buildImage(type: DockerBuildImage) {
+    dependsOn createDockerfile
+    images.add(rootProject.name + ":" + version)
+}
+
+buildImage.dependsOn excludeLibraries
+buildImage.dependsOn copyScript
+buildImage.dependsOn copyScript2
+buildImage.dependsOn copyJar
+buildImage.dependsOn build
+copyJar.dependsOn shadowJar
+
+task tagImage(type:DockerTagImage) {
+    dependsOn buildImage
+    targetImageId(rootProject.name + ':' + version)
+    tag.set 'latest'
+    repository.set 'jw78guro/apps-fantasy-realms'
+}
+
+task publishImage(type:DockerPushImage) {
+    dependsOn tagImage
+    images.add 'jw78guro/apps-fantasy-realms-backend:latest'
+}
