@@ -1,7 +1,11 @@
 package de.johanneswirth.apps.fantasyrealms
 
+import de.johanneswirth.apps.fantasyrealms.cards.artifact.BookOfChanges
 import de.johanneswirth.apps.fantasyrealms.cards.artifact.BookOfChanges.BOOK_OF_CHANGES
+import de.johanneswirth.apps.fantasyrealms.cards.flood.Island.ISLAND
 import de.johanneswirth.apps.fantasyrealms.cards.wild.Doppelgänger.DOPPELGÄNGER
+import de.johanneswirth.apps.fantasyrealms.cards.wild.Mirage.MIRAGE
+import de.johanneswirth.apps.fantasyrealms.cards.wild.Shapeshifter.SHAPESHIFTER
 import de.johanneswirth.apps.fantasyrealms.cards.{Card, Suit}
 import de.johanneswirth.apps.fantasyrealms.game.Player
 import me.tongfei.progressbar.{InteractiveConsoleProgressBarConsumer, PBRenderer, ProgressBar, ProgressBarStyle}
@@ -20,7 +24,11 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 import scala.util.Random
 
+
+
 class CardTests extends AnyFunSuite {
+
+  type Action = Function1[List[Card], Unit]
 
   val js = new JSLauncher
   val reflections = new Reflections("de.johanneswirth.apps.fantasyrealms.cards")
@@ -49,28 +57,7 @@ class CardTests extends AnyFunSuite {
 
   def iterate(hand: List[Class[_ <: Card]], deck: List[Class[_ <: Card]]): Unit = {
     if (hand.length == 7) {
-      val random = Random.between(0, 1)
-      if (random == 0) {
-        val cards = hand.map(_.getDeclaredConstructor().newInstance())
-        if (!cards.exists(_.actionNeeded)) {
-          js.clearHand()
-          val player = new Player(0, "")
-          cards.foreach(player.addToHand)
-          cards.map(_.id).foreach(js.addCard)
-
-          val reference = js.getJSScore
-
-          val f = Future {player.calcScore()}
-          f.map(_ => assert(player.getScore == reference, s"#${passedAsserts+1}: Hand $cards [https://fantasy-realms.github.io/index.html?hand=${cards.map(_.id).mkString(",")}+]"))
-
-//        player.calcScore()
-//        val reference = js.getJSScore
-//        assert(player.getScore == reference, s"#${passedAsserts+1}: Hand $cards [https://fantasy-realms.github.io/index.html?hand=${cards.map(_.id).mkString(",")}+]")
-
-        }
-      }
-      passedAsserts += 1
-      if (passedAsserts % 1000 == 0) pb.step()
+      checkCards(hand)
     } else if (deck.nonEmpty) {
       val first = deck.head
 
@@ -80,40 +67,97 @@ class CardTests extends AnyFunSuite {
     }
   }
 
-  def chooseDoppelgangerCard(hand: List[Card]): Card = {
-    val idx = Random.between(0, hand.length-1)
-    hand.filter(_.name != DOPPELGÄNGER)(idx)
+
+
+  def checkCards(cards: List[Class[_ <: Card]]): Unit = {
+    val hand = cards.map(_.getDeclaredConstructor().newInstance())
+    var options = List[Action]((_) => {})
+    options = addToOptions(options, optionsDoppelganger(hand))
+    options = addToOptions(options, optionsMirage(hand))
+    options = addToOptions(options, optionsShapeshifter(hand))
+    options = addToOptions(options, optionsBookOfChanges(hand))
+    options = addToOptions(options, optionsIsland(hand))
+
+    options.foreach { o =>
+      val hand = cards.map(_.getDeclaredConstructor().newInstance())
+      checkHand(hand, o)
+    }
+    passedAsserts += 1
+    if (passedAsserts % 1000 == 0) pb.step()
   }
 
-  def chooseShapeshifterCard: Card = {
-    val avail = cards.filter(c => List(Suit.Artifact, Suit.Leader, Suit.Wizard, Suit.Weapon, Suit.Beast).contains(c.getSuit))
-    val idx = Random.between(0, avail.length)
-    avail(idx)
+  def addToOptions(options: List[Action], add: List[Action]): List[Action] = {
+    val list = mutable.ListBuffer[Action]()
+    options.foreach{o => {
+      add.foreach(a => {
+        list += ((hand) => {o(hand); a(hand)})
+      })
+    }}
+    list.toList
   }
 
-  def chooseMirageCard: Card = {
-    val avail = cards.filter(c => List(Suit.Army, Suit.Land, Suit.Weather, Suit.Flood, Suit.Flame).contains(c.getSuit))
-    val idx = Random.between(0, avail.length)
-    avail(idx)
+  def checkHand(hand: List[Card], options: Action): Unit = {
+    js.clearHand()
+    val player = new Player(0, "")
+    hand.foreach(player.addToHand)
+    hand.map(_.id).foreach(js.addCard)
+
+    options(hand)
+
+    val reference = js.getJSScore
+
+    val f = Future {player.calcScore()}
+    f.map(_ => assert(player.getScore == reference, s"#${passedAsserts+1}: Hand $cards [https://fantasy-realms.github.io/index.html?hand=${cards.map(_.id).mkString(",")}+]"))
+
   }
 
-  def chooseIslandCard(hand: List[Card]): Option[Card] = {
-    val avail = hand.filter(c => c.getSuit == Suit.Flood || c.getSuit == Suit.Flame)
-    if (avail.isEmpty) None
-    else {
-      val idx = Random.between(0, avail.length)
-      Some(avail(idx))
+  def optionsDoppelganger(hand: List[Card]): List[Action] = {
+    hand.find(_.name == DOPPELGÄNGER) match {
+      case Some(value) =>
+        val idx = hand.indexOf(value)
+        hand.filter(_.name != DOPPELGÄNGER).map(c => (hand) => {hand(idx).setUsage(c); js.actionDoppelganger(c.id)})
+      case None => List((_) => {})
     }
   }
 
-  def chooseBookOfChangesCard(hand: List[Card]): Card = {
-    val idx = Random.between(0, hand.length-1)
-    hand.filter(_.name != BOOK_OF_CHANGES)(idx)
+  def optionsShapeshifter(hand: List[Card]): List[Action] = {
+    hand.find(_.name == SHAPESHIFTER) match {
+      case Some(value) =>
+        val idx = hand.indexOf(value)
+        val avail = cards.filter(c => List(Suit.Artifact, Suit.Leader, Suit.Wizard, Suit.Weapon, Suit.Beast).contains(c.getSuit)).toList
+        avail.map(c => (hand) => {hand(idx).setUsage(c); js.actionShapeshifter(c.id)})
+      case None => List((_) => {})
+    }
   }
 
-  def chooseSuit: Suit = {
-    val idx = Random.between(0, Suit.values().length)
-    Suit.values()(idx)
+  def optionsMirage(hand: List[Card]): List[Action] = {
+    hand.find(_.name == MIRAGE) match {
+      case Some(value) =>
+        val idx = hand.indexOf(value)
+        val avail = cards.filter(c => List(Suit.Army, Suit.Land, Suit.Weather, Suit.Flood, Suit.Flame).contains(c.getSuit)).toList
+        avail.map(c => (hand) => {hand(idx).setUsage(c); js.actionMirage(c.id)})
+      case None => List((_) => {})
+    }
+  }
+
+  def optionsIsland(hand: List[Card]): List[Action] = {
+    hand.find(_.name == ISLAND) match {
+      case Some(value) =>
+        val idx = hand.indexOf(value)
+        hand.filter(c => c.getSuit == Suit.Flood || c.getSuit == Suit.Flame).map(c => (hand) => {hand(idx).setUsage(c); js.actionIsland(c.id)})
+      case None => List((_) => {})
+    }
+  }
+
+  def optionsBookOfChanges(hand: List[Card]): List[Action] = {
+    hand.find(_.name == BOOK_OF_CHANGES) match {
+      case Some(value) =>
+        val idx = hand.indexOf(value)
+        val cards = hand.filter(_.name != BOOK_OF_CHANGES)
+        val suits = Suit.values().toList
+        cards.flatMap(c => suits.map(s => (hand) => {hand(idx).asInstanceOf[BookOfChanges].setUsage(c, s); js.actionBookOfChanges(c.id, s.name().toLowerCase)}))
+      case None => List((_) => {})
+    }
   }
 
   def chooseNecromancerCard(hand: List[Card]): Card = {

@@ -1,5 +1,7 @@
 package de.johanneswirth.apps.fantasyrealms.cards
 
+import de.johanneswirth.apps.fantasyrealms.exceptions.UndefinedActionException
+
 trait Card {
   def name: String
 
@@ -45,6 +47,8 @@ trait Card {
 
   override def toString: String = if (score.isDefined) s"$name ${score.get}" else name
 
+  def setUsage(otherCard: Card): Unit = throw UndefinedActionException
+  def noUsage(): Unit = actionNeeded = false
 
   protected def removeSelf(hand: List[Card]): List[Card] = {
     hand.filter(this != _)

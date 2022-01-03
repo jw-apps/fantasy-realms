@@ -38,7 +38,7 @@ dependencies {
     implementation group: 'io.dropwizard', name: 'dropwizard-auth', version: '2.0.13'
     implementation group: 'io.dropwizard', name: 'dropwizard-migrations', version: '2.0.13'
     implementation group: 'io.dropwizard', name: 'dropwizard-json-logging', version: '2.0.13'
-    implementation group: 'de.johannes-wirth', name: 'apps-backend-common', version: '0.0.1'
+    implementation group: 'de.johannes-wirth', name: 'apps-backend-common', version: '0.0.5'
     implementation 'org.reflections:reflections:0.10.2'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.2'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.2'

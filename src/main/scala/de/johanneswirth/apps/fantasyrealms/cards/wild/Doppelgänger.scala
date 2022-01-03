@@ -14,7 +14,7 @@ class Doppelgänger extends Card {
 
   var otherCard: Option[Card] = None
 
-  def setUsage(otherCard: Card): Unit = {
+  override def setUsage(otherCard: Card): Unit = {
     this.otherCard = Some(otherCard)
     actionNeeded = false
   }

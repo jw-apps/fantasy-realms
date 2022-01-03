@@ -2,7 +2,7 @@ package de.johanneswirth.apps.fantasyrealms.cards.wizard
 
 import de.johanneswirth.apps.fantasyrealms.cards.{Card, Suit}
 
-class Necromancer extends Card {
+/*class Necromancer extends Card {
   override val name: String = "Necromancer"
   setSuit(Suit.Wizard)
   override val basePoints: Int = 3
@@ -11,5 +11,5 @@ class Necromancer extends Card {
 
   //TODO
 
-  def setUsage(): Unit = actionNeeded = false
-}
+  def setUsage(): Unit = actionNeeded = true
+}*/
