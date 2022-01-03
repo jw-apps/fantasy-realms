@@ -1,17 +1,14 @@
 package de.johanneswirth.apps.fantasyrealms
 
-import ch.qos.logback.classic.Level
-import com.typesafe.scalalogging.Logger
 import de.johanneswirth.apps.fantasyrealms.cards.artifact.BookOfChanges.BOOK_OF_CHANGES
 import de.johanneswirth.apps.fantasyrealms.cards.wild.Doppelgänger.DOPPELGÄNGER
 import de.johanneswirth.apps.fantasyrealms.cards.{Card, Suit}
 import de.johanneswirth.apps.fantasyrealms.game.Player
-import me.tongfei.progressbar.{ConsoleProgressBarConsumer, DelegatingProgressBarConsumer, InteractiveConsoleProgressBarConsumer, PBRenderer, ProgressBar, ProgressBarBuilder, ProgressBarStyle, TerminalUtils, Util}
+import me.tongfei.progressbar.{InteractiveConsoleProgressBarConsumer, PBRenderer, ProgressBar, ProgressBarStyle}
 import org.jline.terminal.TerminalBuilder
 import org.jline.utils.InfoCmp
 import org.reflections.Reflections
 import org.scalatest.funsuite.AnyFunSuite
-import org.slf4j.LoggerFactory
 
 import java.io.{FileDescriptor, FileOutputStream, PrintStream}
 import java.text.DecimalFormat
@@ -25,22 +22,23 @@ import scala.util.Random
 
 class CardTests extends AnyFunSuite {
 
-  val count = 776_881_123
-
-  var passedAsserts = 0
   val js = new JSLauncher
-  js.init()
   val reflections = new Reflections("de.johanneswirth.apps.fantasyrealms.cards")
+  js.init()
   val classes = reflections.getSubTypesOf(classOf[Card])
   val cards = mutable.ListBuffer[Card]()
+  val terminal = TerminalBuilder.builder().dumb(true).build()
   classes.forEach{card =>
     cards += card.getDeclaredConstructor().newInstance()
   }
-  val terminal = TerminalBuilder.builder().dumb(true).build()
+  val numCards = cards.length.toLong
+  val count = ((numCards - 6) to numCards).product / (1 to 7).product / 1000
+  cards.length.toLong
+  val real = new PrintStream(new FileOutputStream(FileDescriptor.err))
   println(terminal.getStringCapability(InfoCmp.Capability.cursor_down))
   println(terminal.getStringCapability(InfoCmp.Capability.cursor_up))
-  val real = new PrintStream(new FileOutputStream(FileDescriptor.err))
   private val pb = new ProgressBar("Test", count, 1000, 0, Duration.ZERO, new PBRenderer(ProgressBarStyle.ASCII, "", 1, true, new DecimalFormat("##0.###"), ChronoUnit.SECONDS), new InteractiveConsoleProgressBarConsumer(real, 100))
+  var passedAsserts = 0
 
   test("Score should be equal to reference") {
     val list = classes.asScala.toList
@@ -49,28 +47,30 @@ class CardTests extends AnyFunSuite {
     pb.close()
   }
 
-
   def iterate(hand: List[Class[_ <: Card]], deck: List[Class[_ <: Card]]): Unit = {
     if (hand.length == 7) {
-      val cards = hand.map(_.getDeclaredConstructor().newInstance())
-      if (!cards.exists(_.actionNeeded)) {
-        js.clearHand()
-        val player = new Player(0, "")
-        cards.foreach(player.addToHand)
-        cards.map(_.id).foreach(js.addCard)
+      val random = Random.between(0, 1)
+      if (random == 0) {
+        val cards = hand.map(_.getDeclaredConstructor().newInstance())
+        if (!cards.exists(_.actionNeeded)) {
+          js.clearHand()
+          val player = new Player(0, "")
+          cards.foreach(player.addToHand)
+          cards.map(_.id).foreach(js.addCard)
 
-        val reference = js.getJSScore
+          val reference = js.getJSScore
 
-        val f = Future {player.calcScore()}
-        f.map(_ => assert(player.getScore == reference, s"#${passedAsserts+1}: Hand $cards [https://fantasy-realms.github.io/index.html?hand=${cards.map(_.id).mkString(",")}+]"))
+          val f = Future {player.calcScore()}
+          f.map(_ => assert(player.getScore == reference, s"#${passedAsserts+1}: Hand $cards [https://fantasy-realms.github.io/index.html?hand=${cards.map(_.id).mkString(",")}+]"))
 
 //        player.calcScore()
 //        val reference = js.getJSScore
 //        assert(player.getScore == reference, s"#${passedAsserts+1}: Hand $cards [https://fantasy-realms.github.io/index.html?hand=${cards.map(_.id).mkString(",")}+]")
 
-        passedAsserts += 1
-        if (passedAsserts % 1000 == 0) pb.step()
+        }
       }
+      passedAsserts += 1
+      if (passedAsserts % 1000 == 0) pb.step()
     } else if (deck.nonEmpty) {
       val first = deck.head
 
