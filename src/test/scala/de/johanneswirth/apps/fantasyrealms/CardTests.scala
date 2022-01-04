@@ -86,7 +86,7 @@ class CardTests extends AnyFunSuite {
       if (passedAsserts % 1000 == 0) {
         pb.step()
         pb.maxHint((count * runningMean).round)
-        pb.setExtraMessage(s" Average Options: $runningMean%.2d")
+        pb.setExtraMessage(s" Average Options: $runningMean%2.2f")
       }
     }
   }
