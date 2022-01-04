@@ -6,6 +6,7 @@ import de.johanneswirth.apps.fantasyrealms.cards.flood.Island.ISLAND
 import de.johanneswirth.apps.fantasyrealms.cards.wild.Doppelgänger.DOPPELGÄNGER
 import de.johanneswirth.apps.fantasyrealms.cards.wild.Mirage.MIRAGE
 import de.johanneswirth.apps.fantasyrealms.cards.wild.Shapeshifter.SHAPESHIFTER
+import de.johanneswirth.apps.fantasyrealms.cards.wizard.Necromancer.NECROMANCER
 import de.johanneswirth.apps.fantasyrealms.cards.{Card, Suit}
 import de.johanneswirth.apps.fantasyrealms.game.Player
 import me.tongfei.progressbar.{InteractiveConsoleProgressBarConsumer, PBRenderer, ProgressBar, ProgressBarStyle}
@@ -22,13 +23,13 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.CollectionHasAsScala
-import scala.util.Random
 
 
 
 class CardTests extends AnyFunSuite {
 
-  type Action = Function1[List[Card], Unit]
+  type Action = List[Card] => List[Card]
+  def noAction: Action = (hand: List[Card]) => hand
 
   val js = new JSLauncher
   val reflections = new Reflections("de.johanneswirth.apps.fantasyrealms.cards")
@@ -71,7 +72,8 @@ class CardTests extends AnyFunSuite {
 
   def checkCards(cards: List[Class[_ <: Card]]): Unit = {
     val hand = cards.map(_.getDeclaredConstructor().newInstance())
-    var options = List[Action]((_) => {})
+    var options = List[Action](noAction)
+    options = addToOptions(options, optionsNecromancer(hand))
     options = addToOptions(options, optionsDoppelganger(hand))
     options = addToOptions(options, optionsMirage(hand))
     options = addToOptions(options, optionsShapeshifter(hand))
@@ -89,7 +91,7 @@ class CardTests extends AnyFunSuite {
     val list = mutable.ListBuffer[Action]()
     options.foreach{o => {
       add.foreach(a => {
-        list += ((hand) => {o(hand); a(hand)})
+        list += (hand => {o(hand); a(hand)})
       })
     }}
     list.toList
@@ -114,8 +116,8 @@ class CardTests extends AnyFunSuite {
     hand.find(_.name == DOPPELGÄNGER) match {
       case Some(value) =>
         val idx = hand.indexOf(value)
-        hand.filter(_.name != DOPPELGÄNGER).map(c => (hand) => {hand(idx).setUsage(c); js.actionDoppelganger(c.id)})
-      case None => List((_) => {})
+        hand.filter(_.name != DOPPELGÄNGER).map(c => hand => {hand(idx).setUsage(c); js.actionDoppelganger(c.id); hand})
+      case None => List(noAction)
     }
   }
 
@@ -124,8 +126,8 @@ class CardTests extends AnyFunSuite {
       case Some(value) =>
         val idx = hand.indexOf(value)
         val avail = cards.filter(c => List(Suit.Artifact, Suit.Leader, Suit.Wizard, Suit.Weapon, Suit.Beast).contains(c.getSuit)).toList
-        avail.map(c => (hand) => {hand(idx).setUsage(c); js.actionShapeshifter(c.id)})
-      case None => List((_) => {})
+        avail.map(c => hand => {hand(idx).setUsage(c); js.actionShapeshifter(c.id); hand})
+      case None => List(noAction)
     }
   }
 
@@ -134,8 +136,8 @@ class CardTests extends AnyFunSuite {
       case Some(value) =>
         val idx = hand.indexOf(value)
         val avail = cards.filter(c => List(Suit.Army, Suit.Land, Suit.Weather, Suit.Flood, Suit.Flame).contains(c.getSuit)).toList
-        avail.map(c => (hand) => {hand(idx).setUsage(c); js.actionMirage(c.id)})
-      case None => List((_) => {})
+        avail.map(c => hand => {hand(idx).setUsage(c); js.actionMirage(c.id); hand})
+      case None => List(noAction)
     }
   }
 
@@ -145,10 +147,10 @@ class CardTests extends AnyFunSuite {
         val idx = hand.indexOf(value)
         val avail = hand.filter(_.name != ISLAND).filter(c => c.getSuit == Suit.Flood || c.getSuit == Suit.Flame)
         if (avail.isEmpty)
-          List((_) => {hand(idx).noUsage()})
+          List(hand => {hand(idx).noUsage(); hand})
         else
-          avail.map(c => (hand) => {hand(idx).setUsage(c); js.actionIsland(c.id)})
-      case None => List((_) => {})
+          avail.map(c => hand => {hand(idx).setUsage(c); js.actionIsland(c.id); hand})
+      case None => List(noAction)
     }
   }
 
@@ -158,14 +160,17 @@ class CardTests extends AnyFunSuite {
         val idx = hand.indexOf(value)
         val cards = hand.filter(_.name != BOOK_OF_CHANGES)
         val suits = Suit.values().toList.filter(_ != Suit.None)
-        cards.flatMap(c => suits.map(s => (hand) => {hand(idx).asInstanceOf[BookOfChanges].setUsage(c, s); js.actionBookOfChanges(c.id, s.name().toLowerCase)}))
-      case None => List((_) => {})
+        cards.flatMap(c => suits.map(s => hand => {hand(idx).asInstanceOf[BookOfChanges].setUsage(c, s); js.actionBookOfChanges(c.id, s.name().toLowerCase); hand}))
+      case None => List(noAction)
     }
   }
 
-  def chooseNecromancerCard(hand: List[Card]): Card = {
-    val avail = cards.filter(!hand.contains(_))
-    val idx = Random.between(0, avail.length)
-    avail(idx)
+  def optionsNecromancer(hand: List[Card]): List[Action] = {
+    hand.find(_.name == NECROMANCER) match {
+      case Some(_) =>
+        val avail = cards.filter(!hand.contains(_)).toList
+        avail.map(c => hand => c :: hand)
+      case None => List(noAction)
+    }
   }
 }
