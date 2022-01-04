@@ -87,7 +87,7 @@ class CardTests extends AnyFunSuite {
         pb.step()
         val avgOptions = (count * runningMean).round
         pb.maxHint(avgOptions)
-        pb.setExtraMessage(s"Average Options: $avgOptions")
+        pb.setExtraMessage(s" Average Options: $avgOptions")
       }
     }
   }
