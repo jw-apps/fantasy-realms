@@ -11,7 +11,6 @@ import de.johanneswirth.apps.fantasyrealms.cards.{Card, Suit}
 import de.johanneswirth.apps.fantasyrealms.game.Player
 import me.tongfei.progressbar.{InteractiveConsoleProgressBarConsumer, PBRenderer, ProgressBar, ProgressBarStyle}
 import org.jline.terminal.TerminalBuilder
-import org.jline.utils.InfoCmp
 import org.reflections.Reflections
 import org.scalatest.funsuite.AnyFunSuite
 
@@ -42,12 +41,11 @@ class CardTests extends AnyFunSuite {
   }
   val numCards = cards.length.toLong
   val count = ((numCards - 6) to numCards).product / (1 to 7).product / 1000
-  cards.length.toLong
   val real = new PrintStream(new FileOutputStream(FileDescriptor.err))
-  println(terminal.getStringCapability(InfoCmp.Capability.cursor_down))
-  println(terminal.getStringCapability(InfoCmp.Capability.cursor_up))
   private val pb = new ProgressBar("Test", count, 1000, 0, Duration.ZERO, new PBRenderer(ProgressBarStyle.ASCII, "", 1, true, new DecimalFormat("##0.###"), ChronoUnit.SECONDS), new InteractiveConsoleProgressBarConsumer(real, 100))
   var passedAsserts = 0
+  var runningMean: Double  = 1
+  var numTerms = 0
 
   test("Score should be equal to reference") {
     val list = classes.asScala.toList
@@ -79,12 +77,17 @@ class CardTests extends AnyFunSuite {
     options = addToOptions(options, optionsShapeshifter(hand))
     options = addToOptions(options, optionsBookOfChanges(hand))
     options = addToOptions(options, optionsIsland(hand))
+    numTerms += 1
+    runningMean = runningMean + ((options.length - runningMean) / numTerms)
     options.foreach { o =>
       val hand = cards.map(_.getDeclaredConstructor().newInstance())
       checkHand(hand, o)
+      passedAsserts += 1
+      if (passedAsserts % 1000 == 0) {
+        pb.step()
+        pb.maxHint((count * runningMean).round)
+      }
     }
-    passedAsserts += 1
-    if (passedAsserts % 1000 == 0) pb.step()
   }
 
   def addToOptions(options: List[Action], add: List[Action]): List[Action] = {
