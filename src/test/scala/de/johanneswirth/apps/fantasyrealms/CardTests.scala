@@ -77,7 +77,6 @@ class CardTests extends AnyFunSuite {
     options = addToOptions(options, optionsShapeshifter(hand))
     options = addToOptions(options, optionsBookOfChanges(hand))
     options = addToOptions(options, optionsIsland(hand))
-
     options.foreach { o =>
       val hand = cards.map(_.getDeclaredConstructor().newInstance())
       checkHand(hand, o)
@@ -144,7 +143,11 @@ class CardTests extends AnyFunSuite {
     hand.find(_.name == ISLAND) match {
       case Some(value) =>
         val idx = hand.indexOf(value)
-        hand.filter(c => c.getSuit == Suit.Flood || c.getSuit == Suit.Flame).map(c => (hand) => {hand(idx).setUsage(c); js.actionIsland(c.id)})
+        val avail = hand.filter(_.name != ISLAND).filter(c => c.getSuit == Suit.Flood || c.getSuit == Suit.Flame)
+        if (avail.isEmpty)
+          List((_) => {hand(idx).noUsage()})
+        else
+          avail.map(c => (hand) => {hand(idx).setUsage(c); js.actionIsland(c.id)})
       case None => List((_) => {})
     }
   }
@@ -154,7 +157,7 @@ class CardTests extends AnyFunSuite {
       case Some(value) =>
         val idx = hand.indexOf(value)
         val cards = hand.filter(_.name != BOOK_OF_CHANGES)
-        val suits = Suit.values().toList
+        val suits = Suit.values().toList.filter(_ != Suit.None)
         cards.flatMap(c => suits.map(s => (hand) => {hand(idx).asInstanceOf[BookOfChanges].setUsage(c, s); js.actionBookOfChanges(c.id, s.name().toLowerCase)}))
       case None => List((_) => {})
     }
