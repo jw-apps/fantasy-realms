@@ -42,7 +42,7 @@ class CardTests extends AnyFunSuite {
   val numCards = cards.length.toLong
   val count = ((numCards - 6) to numCards).product / (1 to 7).product / 1000
   val real = new PrintStream(new FileOutputStream(FileDescriptor.err))
-  private val pb = new ProgressBar("Test", count, 1000, 0, Duration.ZERO, new PBRenderer(ProgressBarStyle.ASCII, "", 1, true, new DecimalFormat("##0.###"), ChronoUnit.SECONDS), new InteractiveConsoleProgressBarConsumer(real, 100))
+  private val pb = new ProgressBar("Test", count, 1000, 0, Duration.ZERO, new PBRenderer(ProgressBarStyle.ASCII, "", 1, true, new DecimalFormat("##0.###"), ChronoUnit.SECONDS), new InteractiveConsoleProgressBarConsumer(real, 200))
   var passedAsserts = 0
   var runningMean: Double  = 1
   var numTerms = 0
@@ -86,7 +86,7 @@ class CardTests extends AnyFunSuite {
       if (passedAsserts % 1000 == 0) {
         pb.step()
         pb.maxHint((count * runningMean).round)
-        pb.setExtraMessage(s" Average Options: $runningMean")
+        pb.setExtraMessage(s" Average Options: $runningMean%.2d")
       }
     }
   }
