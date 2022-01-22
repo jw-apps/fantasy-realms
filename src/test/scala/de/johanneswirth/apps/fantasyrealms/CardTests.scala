@@ -22,6 +22,7 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.CollectionHasAsScala
+import scala.util.Random
 
 
 
@@ -68,7 +69,7 @@ class CardTests extends AnyFunSuite {
 
 
 
-  def checkCards(cards: List[Class[_ <: Card]]): Unit = {
+  /*def checkCards(cards: List[Class[_ <: Card]]): Unit = {
     val hand = cards.map(_.getDeclaredConstructor().newInstance())
     var options = List[Action](noAction)
     options = addToOptions(options, optionsNecromancer(hand))
@@ -82,6 +83,32 @@ class CardTests extends AnyFunSuite {
     options.foreach { o =>
       val hand = cards.map(_.getDeclaredConstructor().newInstance())
       checkHand(hand, o)
+      passedAsserts += 1
+      if (passedAsserts % 1000 == 0) {
+        pb.step()
+        pb.maxHint((count * runningMean).round)
+        pb.setExtraMessage(f" Average Options: $runningMean%.2f")
+      }
+    }
+  }*/
+
+  def checkCards(cards: List[Class[_ <: Card]]): Unit = {
+    val hand = cards.map(_.getDeclaredConstructor().newInstance())
+    var options = List[Action](noAction)
+    options = addToOptions(options, optionsNecromancer(hand))
+    options = addToOptions(options, optionsDoppelganger(hand))
+    options = addToOptions(options, optionsMirage(hand))
+    options = addToOptions(options, optionsShapeshifter(hand))
+    options = addToOptions(options, optionsBookOfChanges(hand))
+    options = addToOptions(options, optionsIsland(hand))
+    val min = Math.min(3, options.length)
+    numTerms += 1
+    runningMean = runningMean + ((min - runningMean) / numTerms)
+    for (i <- 0 until min) {
+      val index = Random.between(0, options.length)
+
+      val hand = cards.map(_.getDeclaredConstructor().newInstance())
+      checkHand(hand, options(index))
       passedAsserts += 1
       if (passedAsserts % 1000 == 0) {
         pb.step()
